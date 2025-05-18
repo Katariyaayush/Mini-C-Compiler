@@ -2,24 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "symboltable.h"
 
-void yyerror(const char *);
+void yyerror(const char *s);
 int yylex(void);
 
-typedef struct symrec {
-    char *name;
-    char *type; // "int" or "float"
-    struct symrec *next;
-} symrec;
-
-symrec *sym_table = NULL;
-
-symrec *putsym(char *name, char *type);
-symrec *getsym(char *name);
-void print_sym_table();
-
 int semantic_error = 0;
-
 %}
 
 %union {
@@ -37,8 +25,7 @@ int semantic_error = 0;
 %token EQ NE LE GE
 
 %type <type_name> type
-%type <type_name> expr
-%type <type_name> simple_expr term factor
+%type <type_name> expr simple_expr term factor
 
 %start program
 
@@ -48,10 +35,10 @@ program:
     decl_list
     {
         if (!semantic_error) {
-            printf("\nParsing and semantic analysis successful!\n");
+            printf("\nParsing and semantic analysis successful.\n");
             print_sym_table();
         } else {
-            printf("\nSemantic errors found.\n");
+            printf("\nSemantic errors detected.\n");
         }
     }
     ;
@@ -69,7 +56,7 @@ decl:
 var_decl:
     type ID ';'
     {
-        if (getsym($2) != NULL) {
+        if (getsym($2)) {
             printf("Semantic error: Redeclaration of variable '%s'\n", $2);
             semantic_error = 1;
         } else {
@@ -80,7 +67,7 @@ var_decl:
     ;
 
 type:
-    INT { $$ = "int"; }
+    INT   { $$ = "int"; }
     | FLOAT { $$ = "float"; }
     ;
 
@@ -100,7 +87,7 @@ param_list:
 param:
     type ID
     {
-        if (getsym($2) != NULL) {
+        if (getsym($2)) {
             printf("Semantic error: Redeclaration of parameter '%s'\n", $2);
             semantic_error = 1;
         } else {
@@ -153,81 +140,72 @@ expr:
             printf("Semantic error: Undeclared variable '%s'\n", $1);
             semantic_error = 1;
             $$ = NULL;
-        } else if ($3 == NULL) {
-            $$ = NULL;
-        } else if (strcmp(sym->type, $3) != 0) {
+        } else if ($3 && strcmp(sym->type, $3) != 0) {
             printf("Semantic error: Type mismatch in assignment to '%s'\n", $1);
             semantic_error = 1;
             $$ = NULL;
         } else {
-            $$ = sym->type;
+            $$ = sym ? sym->type : NULL;
         }
     }
     | simple_expr
+    {
+        $$ = $1;
+    }
     ;
 
 simple_expr:
     simple_expr '+' term
     {
-        if ($1 && $3) {
-            if (strcmp($1, $3) == 0)
-                $$ = $1;
-            else {
-                printf("Semantic error: Type mismatch in '+' operation\n");
-                semantic_error = 1;
-                $$ = NULL;
-            }
-        } else {
+        if ($1 && $3 && strcmp($1, $3) == 0)
+            $$ = $1;
+        else {
+            printf("Semantic error: Type mismatch in '+' expression\n");
+            semantic_error = 1;
             $$ = NULL;
         }
     }
     | simple_expr '-' term
     {
-        if ($1 && $3) {
-            if (strcmp($1, $3) == 0)
-                $$ = $1;
-            else {
-                printf("Semantic error: Type mismatch in '-' operation\n");
-                semantic_error = 1;
-                $$ = NULL;
-            }
-        } else {
+        if ($1 && $3 && strcmp($1, $3) == 0)
+            $$ = $1;
+        else {
+            printf("Semantic error: Type mismatch in '-' expression\n");
+            semantic_error = 1;
             $$ = NULL;
         }
     }
     | term
+    {
+        $$ = $1;
+    }
     ;
 
 term:
     term '*' factor
     {
-        if ($1 && $3) {
-            if (strcmp($1, $3) == 0)
-                $$ = $1;
-            else {
-                printf("Semantic error: Type mismatch in '*' operation\n");
-                semantic_error = 1;
-                $$ = NULL;
-            }
-        } else {
+        if ($1 && $3 && strcmp($1, $3) == 0)
+            $$ = $1;
+        else {
+            printf("Semantic error: Type mismatch in '*' expression\n");
+            semantic_error = 1;
             $$ = NULL;
         }
     }
     | term '/' factor
     {
-        if ($1 && $3) {
-            if (strcmp($1, $3) == 0)
-                $$ = $1;
-            else {
-                printf("Semantic error: Type mismatch in '/' operation\n");
-                semantic_error = 1;
-                $$ = NULL;
-            }
-        } else {
+        if ($1 && $3 && strcmp($1, $3) == 0)
+            $$ = $1;
+        else {
+            printf("Semantic error: Type mismatch in '/' expression\n");
+            semantic_error = 1;
             $$ = NULL;
         }
     }
     | factor
+    {
+        $$ = $1;
+    }
     ;
 
 factor:
@@ -262,36 +240,9 @@ void yyerror(const char *s) {
     fprintf(stderr, "Parse error: %s\n", s);
 }
 
-symrec *putsym(char *name, char *type) {
-    symrec *ptr = (symrec *) malloc(sizeof(symrec));
-    ptr->name = strdup(name);
-    ptr->type = strdup(type);
-    ptr->next = sym_table;
-    sym_table = ptr;
-    return ptr;
-}
-
-symrec *getsym(char *name) {
-    symrec *ptr = sym_table;
-    while (ptr != NULL) {
-        if (strcmp(ptr->name, name) == 0)
-            return ptr;
-        ptr = ptr->next;
-    }
-    return NULL;
-}
-
-void print_sym_table() {
-    printf("\nSymbol Table:\n");
-    symrec *ptr = sym_table;
-    while (ptr != NULL) {
-        printf("Name: %s, Type: %s\n", ptr->name, ptr->type);
-        ptr = ptr->next;
-    }
-}
-
 int main() {
-    printf("Enter MiniC code:\n");
+    printf("Enter MiniC code below:\n");
     yyparse();
+    clear_sym_table();
     return 0;
 }
