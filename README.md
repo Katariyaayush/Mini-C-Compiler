@@ -1,4 +1,6 @@
-Compile & Run : flex lexer.l
-                bison -d parser.y
-                gcc lex.yy.c parser.tab.c -o parser -lfl
-                ./parser < test.c
+readme
+
+flex lexer.l
+bison -d -b parser parser.y
+gcc parser.tab.c lex.yy.c -o myparser -lfl
+./myparser < test.c
