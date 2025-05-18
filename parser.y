@@ -4,7 +4,6 @@
 
 void yyerror(const char *);
 int yylex(void);
-
 %}
 
 %union {
@@ -19,6 +18,8 @@ int yylex(void);
 
 %token IF ELSE WHILE RETURN INT FLOAT
 %token EQ NE LE GE
+
+%type <ival> type
 
 %start program
 
@@ -82,6 +83,7 @@ stmt:
     | selection_stmt
     | iteration_stmt
     | return_stmt
+    | var_decl     /* allow variable declarations inside compound statements */
     ;
 
 expr_stmt:
@@ -120,10 +122,18 @@ term:
     ;
 
 factor:
-    '(' expr ')'
+      '(' type ')' factor         /* cast */
+    | '(' expr ')'               /* parentheses */
+    | ID '(' arg_list ')'        /* function call */
     | ID
     | INT_CONST
     | FLOAT_CONST
+    ;
+
+arg_list:
+      arg_list ',' expr
+    | expr
+    | /* empty */
     ;
 
 %%
