@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "symboltable.h"
+#include "symboltable.c"
 
 void yyerror(const char *s);
 int yylex(void);
